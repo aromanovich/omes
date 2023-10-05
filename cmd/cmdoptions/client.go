@@ -1,13 +1,28 @@
 package cmdoptions
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"os"
+
 	"github.com/spf13/pflag"
 	"go.temporal.io/sdk/client"
 	"go.uber.org/zap"
 )
+
+type oAuthTokenProvider struct {
+	token string
+}
+
+func (p *oAuthTokenProvider) GetHeaders(ctx context.Context) (map[string]string, error) {
+	return map[string]string{"Authorization": p.token}, nil
+}
+
+func newOAuthTokenProvider(token string) *oAuthTokenProvider {
+	return &oAuthTokenProvider{token: token}
+}
 
 // Options for creating a Temporal client.
 type ClientOptions struct {
@@ -64,6 +79,7 @@ func (c *ClientOptions) Dial(metrics *Metrics, logger *zap.SugaredLogger) (clien
 	clientOptions.ConnectionOptions.TLS = tlsCfg
 	clientOptions.Logger = NewZapAdapter(logger.Desugar())
 	clientOptions.MetricsHandler = metrics.NewHandler()
+	clientOptions.HeadersProvider = newOAuthTokenProvider(os.Getenv("TEMPORAL_AUTH_TOKEN"))
 
 	client, err := client.Dial(clientOptions)
 	if err != nil {
